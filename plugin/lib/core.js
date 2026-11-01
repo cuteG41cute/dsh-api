@@ -77,6 +77,13 @@ function userMessage(text, source) {
   }
 }
 
+// 注入指令的 producer-owned source。
+// dsh ≥0.2.1（会话格式 v4）的准入校验拒绝「kind 为 plugin 的 v3 旧形态」（抛
+// SessionFormatError: format v4 message requires a producer-owned source kind），
+// v4 等价形态是「kind: 'plugin:<name>'」且不再携带 plugin 字段；0.1.x 无该校验，
+// 新形态同样被接受。见 dsh-session-format-v3-to-v4 的 producerKind()。
+const API_SOURCE = { kind: 'plugin:dsh-api', form: 'instructions' }
+
 function textOf(message) {
   const blocks = message && message.content
   if (!Array.isArray(blocks)) return ''
@@ -241,7 +248,7 @@ async function runTask(ctx, state, task) {
       await agent.whenIdle()
       firstSeq = agent.session.seq
       if (task.system) {
-        agent.inject(userMessage(task.system, { kind: 'plugin', plugin: 'dsh-api', form: 'instructions' }))
+        agent.inject(userMessage(task.system, API_SOURCE))
       }
       agent.followup(userMessage(task.prompt))
       await agent.whenIdle()
@@ -253,7 +260,10 @@ async function runTask(ctx, state, task) {
       try { await sessions.flush(agent.session) } catch { /* flush is best-effort */ }
     }
 
-    const outcome = summarize(agent.session.events, firstSeq)
+    // dsh 0.1.5-rc.1 的 Session 没有 `events` 属性（只有 snapshotEvents()/ownEvents()）；
+    // 旧写法会让 summarize 抛 "events is not iterable"，任务一律记成 failed 且拿不到 reply。
+    // snapshotEvents() 默认返回 [0, seq) 全量事件，与原来的语义一致（下面仍按 firstSeq 过滤）。
+    const outcome = summarize(agent.session.snapshotEvents(), firstSeq)
     const turnKind = outcome.turnEnd ? outcome.turnEnd.kind : 'unknown'
 
     let status

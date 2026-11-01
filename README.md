@@ -72,5 +72,12 @@ curl http://127.0.0.1:3080/api/v1/health -H "X-API-Key: 你的密钥"
 
 ## 版本
 
+v1.0.1 — 兼容 dsh ≥0.2.1（会话格式 v4）：`system` 注入消息的 source 从 v3 旧形态
+（`kind: 'plugin'`，v4 准入校验拒绝并抛 `SessionFormatError: format v4 message
+requires a producer-owned source kind`）改为 producer-owned 形态
+`kind: 'plugin:dsh-api'`（不再携带 plugin 字段）。0.1.x 无该校验，新形态同样被
+接受，行为不变。另含 `Session.events` → `snapshotEvents()` 适配（0.1.5-rc.1+
+的 Session 无 `events` 属性，此前每个任务都会以 failed 告终且丢失回复）。
+
 v1.0 — 对应本机已验证的部署（含 firstSeq 修复、defaultCwd、wait 同步模式、
 多轮续接、取消、并发上限、鉴权）。
