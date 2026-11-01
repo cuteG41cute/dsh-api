@@ -14,6 +14,8 @@
  *   defaultTimeoutMs per-task budget, default 1200000 (20 min)
  *   maxTimeoutMs     hard cap for any task, default 7200000 (2 h)
  *   retentionMs      live-agent grace window after a task settles, default 600000
+ *   taskTtlMs        finished task records are pruned after this long
+ *                    (default 86400000 = 24 h; <= 0 disables pruning)
  *   maxConcurrent    concurrent task cap, default 8
  *   maxBodyBytes     request body cap, default 2097152 (2 MiB)
  *   maxPromptChars   prompt length cap, default 500000
@@ -29,6 +31,7 @@ const DEFAULTS = {
   defaultTimeoutMs: 1200000,
   maxTimeoutMs: 7200000,
   retentionMs: 600000,
+  taskTtlMs: 86400000,
   maxConcurrent: 8,
   maxBodyBytes: 2097152,
   maxPromptChars: 500000,
@@ -41,6 +44,8 @@ function normalize(cfg) {
   c.defaultTimeoutMs = Number(c.defaultTimeoutMs) || DEFAULTS.defaultTimeoutMs
   c.maxTimeoutMs = Math.max(Number(c.maxTimeoutMs) || DEFAULTS.maxTimeoutMs, c.defaultTimeoutMs)
   c.retentionMs = Number(c.retentionMs) || DEFAULTS.retentionMs
+  const ttl = Number(c.taskTtlMs)
+  c.taskTtlMs = Number.isFinite(ttl) && ttl >= 0 ? ttl : DEFAULTS.taskTtlMs
   c.maxConcurrent = Math.max(1, Number(c.maxConcurrent) || DEFAULTS.maxConcurrent)
   c.maxBodyBytes = Math.max(1024, Number(c.maxBodyBytes) || DEFAULTS.maxBodyBytes)
   c.maxPromptChars = Math.max(1, Number(c.maxPromptChars) || DEFAULTS.maxPromptChars)

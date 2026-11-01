@@ -55,7 +55,7 @@ curl http://127.0.0.1:3080/api/v1/health -H "X-API-Key: 你的密钥"
 | 端点 | 功能 |
 | --- | --- |
 | `GET /api/v1/health` | 健康检查 |
-| `POST /api/v1/tasks` | 提交任务（`prompt` 必填；支持 `preset/cwd/model/provider/maxTokens/system/timeoutMs/sessionId/wait`） |
+| `POST /api/v1/tasks` | 提交任务（`prompt` 必填；支持 `preset/cwd/model/provider/maxTokens/reasoningEffort/system/timeoutMs/sessionId/wait`；`system` 仅会话首个任务生效） |
 | `GET /api/v1/tasks` | 最近任务列表 |
 | `GET /api/v1/tasks/:taskId` | 轮询状态，取回 `reply`、`transcript`、`toolCalls` 等 |
 | `DELETE /api/v1/tasks/:taskId` | 取消任务并释放 agent |
@@ -71,6 +71,23 @@ curl http://127.0.0.1:3080/api/v1/health -H "X-API-Key: 你的密钥"
 - 任务记录存于内存，harness 重启后需重新提交（会话本身持久化在 `~/.dsh/sessions`）。
 
 ## 版本
+
+v1.1.0 — 修复审计发现的行为问题：
+
+- **任务状态语义**：`turn/end` 的 6 种权威结束原因不再全部映射为 `completed`。
+  新状态枚举 `completed / failed / timeout / canceled / max-tokens`——输出撞上限
+  报 `max-tokens`（`reply` 保留部分文本）、被策略拦停报 `failed(BLOCKED)`、
+  崩溃恢复收尾报 `failed(INTERRUPTED)`、非本 API 取消报 `canceled`。
+  `turnEnd` 字段始终携带原始结束原因供细查。
+- **CORS 预检**：OPTIONS 现在先于鉴权应答（204 + CORS 头），浏览器可直接调用。
+- **system 仅首个任务生效**：续接任务带 `system` 会被忽略（避免上下文累积重复指令）。
+- **reasoningEffort**：请求新增可选字段，按任务指定推理力度（透传 AgentOptions）。
+- **任务记录清理**：新增配置 `taskTtlMs`（默认 24 小时）——已结束任务超时自动清理，
+  防止长跑宿主内存无限增长（≤0 禁用）。
+- **`GET /tasks` 语义修正**：返回最近 50 条、最新在前（此前实为最旧的 50 条）。
+- **preset 单次解析**：preset 在提交时解析一次，任务执行不再重复全量扫描预设目录。
+- **installModelSelectionLocal 与上游同步**：补齐 agent/pre-step 的 model-switch
+  notice（同会话跨任务换模型时模型会收到换模提示；notice source 亦为 v4 安全形态）。
 
 v1.0.1 — 兼容 dsh ≥0.2.1（会话格式 v4）：`system` 注入消息的 source 从 v3 旧形态
 （`kind: 'plugin'`，v4 准入校验拒绝并抛 `SessionFormatError: format v4 message

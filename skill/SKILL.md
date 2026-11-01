@@ -55,7 +55,8 @@ Content-Type: application/json
 | `cwd` | string | | 任务工作目录（绝对路径；默认 `process.cwd()`，即 harness 启动目录） |
 | `provider` / `model` | string | | 覆盖模型路由（默认使用 harness 当前默认模型） |
 | `maxTokens` | number | | 单次模型输出上限 |
-| `system` | string | | 附加系统指令（以 `instructions` 上下文注入） |
+| `reasoningEffort` | string | | 推理力度（由 provider/adapter 解释，如 `high`） |
+| `system` | string | | 附加系统指令（以 `instructions` 上下文注入）。**仅会话首个任务生效**；续接任务带 `system` 会被忽略（避免上下文累积重复指令） |
 | `timeoutMs` | number | | 本任务预算（默认 20 分钟，上限 2 小时） |
 | `sessionId` | string | | **续接**：复用之前 API 创建的会话继续对话 |
 | `wait` | boolean | | `true` 时同步等待任务完成再返回（默认 `false` 异步+轮询） |
@@ -122,7 +123,7 @@ curl -s http://127.0.0.1:3080/api/v1/tasks/task-xxxx -H "X-API-Key: $KEY"
 | 字段 | 说明 |
 | --- | --- |
 | `taskId` / `sessionId` | 任务与会话标识（`sessionId` 可用于续接） |
-| `status` | `running` / `completed` / `failed` / `timeout` / `canceled` |
+| `status` | `running` / `completed` / `failed` / `timeout` / `canceled` / `max-tokens`（输出撞上限被截断，`reply` 保留部分文本） |
 | `reply` | **最终回复文本**（最后一条 assistant 消息） |
 | `transcript` | 完整对话记录 `[{role:"user"|"assistant", text}]` |
 | `toolCalls` | 工具调用列表 `[{name, callId}]`（如 `write`、`bash`） |
@@ -188,6 +189,9 @@ curl -s -X POST http://127.0.0.1:3080/api/v1/tasks \
 | 409 | `preset_conflict` | 续接时更换了预设 |
 | 413 | `payload_too_large` / `prompt_too_long` | 请求体 / prompt 超限 |
 | 429 | `busy` | 并发任务超过上限（默认 8） |
+| 任务内 | `BLOCKED` | 轮次被策略拦停（`status=failed`，`turnEnd=blocked`） |
+| 任务内 | `INTERRUPTED` | 轮次被崩溃恢复收尾打断（`status=failed`），请重跑任务 |
+| 任务内 | `UNKNOWN_TURN_END` | 轮次以未知原因结束（`status=failed`） |
 | 任务内 | `error: {code, message}` | agent 轮次失败（LLM 错误、工具失败等），见 `turnEnd` |
 
 ## 9. 运维须知
